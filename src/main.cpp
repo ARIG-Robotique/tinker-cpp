@@ -1,311 +1,262 @@
-//#define DEBUG
-//#define SCREEN
-
+#include <config.h>
 #include <Arduino.h>
-#include <FastLED.h>
 #include <Wire.h>
+#include <I2CUtils.h>
+#include <MD22.h>
+#include <PS2X_lib.h>
 
 #if defined(SCREEN)
   #include <Adafruit_GFX.h>
   #include <Adafruit_SSD1306.h>
 #endif
+#if defined(LEDS)
+  #include <FastLED.h>
+#endif
+
+// PSX Configuration
+#define PS2_DAT        9  //14    
+#define PS2_CMD        10  //15
+#define PS2_SEL        11  //16
+#define PS2_CLK        12  //17
+#define pressures      false // analog reading of push-butttons 
+#define rumble         true // motor rumbling
+PS2X ps2x; // Static instantiation of the library
+
+int psxErrorState = 0;
+byte type = 0;
+byte vibrate = 0;
 
 #if defined(SCREEN)
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 32 // OLED display height, in pixels
-#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
-#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+  #define SCREEN_WIDTH 128 // OLED display width, in pixels
+  #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+  #define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+  #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #endif
 
-#define NUM_LEDS_FOUILLE 1
-#define NUM_LEDS_VENTOUSE 2
-#define NUM_LEDS_STOCK 6
+#if defined(LEDS)
+  #define SMALL_RING 24
+  #define LARGE_RING 36
 
-#define NB_BANDEAU_LED 1 // nombre de groupes de led 1, 2 ou 3
+  #define NUM_LEDS (SMALL_RING + LARGE_RING)
 
-#if NB_BANDEAU_LED == 1
-#define NUM_LEDS_BANDEAU_1 (NUM_LEDS_FOUILLE + NUM_LEDS_VENTOUSE + NUM_LEDS_STOCK)
-#elif NB_BANDEAU_LED == 2
-#define NUM_LEDS_BANDEAU_1 (NUM_LEDS_FOUILLE)
-#define NUM_LEDS_BANDEAU_2 (NUM_LEDS_STOCK + NUM_LEDS_VENTOUSE)
-#elif NB_BANDEAU_LED == 3
-#define NUM_LEDS_BANDEAU_1 (NUM_LEDS_FOUILLE)
-#define NUM_LEDS_BANDEAU_2 (NUM_LEDS_VENTOUSE)
-#define NUM_LEDS_BANDEAU_3 (NUM_LEDS_STOCK)
+  CRGB leds[NUM_LEDS];
 #endif
 
-CRGB ledsBandeau1[NUM_LEDS_BANDEAU_1];
-#if NB_BANDEAU_LED > 1
-CRGB ledsBandeau2[NUM_LEDS_BANDEAU_2];
-#endif
-#if NB_BANDEAU_LED > 2
-CRGB ledsBandeau3[NUM_LEDS_BANDEAU_3];
-#endif
+// Config moteurs
+#define MD22_ADD_BOARD				0x58
+#define LEFT_MOTOR					ASSIGN_MOTOR_1
+#define RIGHT_MOTOR					ASSIGN_MOTOR_2
+MD22 motors = MD22(MD22_ADD_BOARD, MODE_1, 0);
 
-enum CarreFouille : byte {
-  INCONNU,
-  JAUNE,
-  VIOLET,
-  INTERDIT
-};
+int left = 0;
+int right = 0;
 
-// Private variables //
-// ----------------- //
-int i2cAddress = 0x3C;
-
-volatile CarreFouille carreFouille = INCONNU;
+// Alternate buildin LED
+boolean alt = false;
+CRGB color = CRGB::Black;
 
 // Prototypes for functions defined at the end of this file //
 // -------------------------------------------------------- //
-#if defined(SCREEN) 
-void printStatesScreen(int value, String name);
-#endif
-void i2cOnReceive(int length);
-void i2cOnRequest();
-void processReceive(int length, boolean wire);
-
-void readCarreFouille();
-boolean between(int value, int medium);
-
-void couleurCarreFouille(CRGB couleur);
-void couleurStock(uint8_t index, CRGB couleur);
-void couleurVentouse(uint8_t index, CRGB couleur);
 
 // Configuration //
 // ------------- //
-void setup()
-{
-#if defined(DEBUG)
-  Serial.begin(115200);
-  Serial.println("Setup");
+void setup() {
+  #if defined(DEBUG)
+    Serial.begin(115200);
+    Serial.println("Setup");
+  #endif
 
-  Serial.println(" - Configuration des I/O");
-#endif
+  #if defined(DEBUG)
+    Serial.println(" - Configuration I2C");
+  #endif
+  Wire.begin();
+  byte nbDevices = i2cUtils.scan();
 
-  analogReference(EXTERNAL);
-  pinMode(A0, INPUT);
+  #if defined(DEBUG)
+    Serial.print(" * Nb I2C devices : ");
+    Serial.println(nbDevices, DEC);
+  #endif
+
+  #if defined(LEDS)
+    #if defined(DEBUG)
+      Serial.println(" - Configuration LEDs");
+    #endif
+
+    FastLED.addLeds<NEOPIXEL, 6>(leds, NUM_LEDS);
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Green;
+      FastLED.show();
+      FastLED.delay(10);
+    }
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Black;
+      FastLED.show();
+      FastLED.delay(10);
+    }
+  #endif 
+
+  #if defined(DEBUG)
+    Serial.println(" - Configuration des I/O");
+  #endif
   pinMode(LED_BUILTIN, OUTPUT);
 
-#if defined(SCREEN)
-  #if defined(DEBUG)
-    Serial.println(" - Configuration Ecran OLED");
+  #if defined(SCREEN)
+    #if defined(DEBUG)
+      Serial.println(" - Configuration Ecran OLED");
+    #endif
+
+    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false)) {
+      #if defined(DEBUG)
+        Serial.println(F("SSD1306 allocation failed"));
+      #endif
+    
+      #if defined(LEDS)
+        while(1) {
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = alt ? CRGB::DarkRed : CRGB::Black;
+          }
+          alt = !alt;
+          FastLED.show();
+          FastLED.delay(1000);
+        } 
+      #else
+        digitalWrite(LED_BUILTIN, HIGH);
+        while(true);
+      #endif
+    }
+
+    // Show initial display buffer contents on the screen --
+    // the library initializes this with an Adafruit splash screen.
+    display.display();
+    delay(1000); // Pause for 2 seconds
+
+    // Clear the buffer
+    display.clearDisplay();
   #endif
-  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+
   #if defined(DEBUG)
-    Serial.println(F("SSD1306 allocation failed"));
+    Serial.println(" - Configuration MD22");
   #endif
-    for(;;); // Don't proceed, loop forever
-  }
+  motors.assignMotors(LEFT_MOTOR, RIGHT_MOTOR);
+  motors.stopAll();
 
-  // Show initial display buffer contents on the screen --
-  // the library initializes this with an Adafruit splash screen.
-  display.display();
-  delay(2000); // Pause for 2 seconds
+  // Setup the PS2X library
+  do {
+    #if defined(DEBUG)
+      Serial.println(" - Configuration PS2 Remote controller");
+    #endif  
 
-  // Clear the buffer
-  display.clearDisplay();
-#endif
+    psxErrorState = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
 
-  
-  Wire.begin(i2cAddress);
-  Wire.onReceive(i2cOnReceive);
-  Wire.onRequest(i2cOnRequest);
-#if defined(DEBUG)
-  Serial.print(" - I2C [OK] (Addresse : ");
-  Serial.print(i2cAddress, HEX);
-  Serial.println(")");
+    #if defined(DEBUG)
+      if(psxErrorState == 0) {
+        Serial.print("Found Controller, configured successful ");
+        Serial.print("[pressures = ");
+        Serial.print(pressures ? "true ; " : "false ; ");
+        Serial.print("rumble = ");
+        Serial.println(rumble ? "true]" : "false]");
+        
+      } else if(psxErrorState == 1) {
+        Serial.println("No controller found, check wiring, see readme.txt to enable debug. visit www.billporter.info for troubleshooting tips");
+      
+      } else if(psxErrorState == 2) {
+        Serial.println("Controller found but not accepting commands. see readme.txt to enable debug. Visit www.billporter.info for troubleshooting tips");
 
-  Serial.print(" - Configuration bandeau(x) LEDs : ");
-  Serial.println(NB_BANDEAU_LED);
-#endif
+      } else if(psxErrorState == 3) {
+        Serial.println("Controller refusing to enter Pressures mode, may not support it. ");
+      }
+          
+      type = ps2x.readType(); 
+      switch(type) {
+        case 0:
+          Serial.println("Unknown Controller type found ");
+          break;
+        case 1:
+          Serial.println("DualShock Controller found ");
+          break;
+        case 2:
+          Serial.println("GuitarHero Controller found ");
+          break;
+      case 3:
+          Serial.println("Wireless Sony DualShock Controller found ");
+          break;
+      }
+    #endif
+  } while (psxErrorState != 0);
 
-  FastLED.addLeds<NEOPIXEL, 6>(ledsBandeau1, NUM_LEDS_BANDEAU_1);
-#if NB_BANDEAU_LED > 1
-  FastLED.addLeds<NEOPIXEL, 5>(ledsBandeau2, NUM_LEDS_BANDEAU_2);
-#endif
-#if NB_BANDEAU_LED > 2
-  FastLED.addLeds<NEOPIXEL, 3>(ledsBandeau3, NUM_LEDS_BANDEAU_3);
-#endif
+  ps2x.read_gamepad(true, 100); 
+  delay(1000);
+  ps2x.read_gamepad(false, 0); 
 }
 
 // Main loop //
 // --------- //
 void loop() {
-  EVERY_N_MILLIS(2) {
-    readCarreFouille();
-  }
 
   EVERY_N_SECONDS(1) {
-    digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) == LOW ? HIGH : LOW);
+    #if defined(LEDS)
+      for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = alt ? color : CRGB::Black;
+      }
+      alt = !alt;
+      FastLED.show();
+    #endif
   }
 
-#if defined(DEBUG)
-  if (Serial.available()) {
-    processReceive(7, false);
-  }
-#endif
+  EVERY_N_MILLISECONDS(50) {
+    ps2x.read_gamepad(false, vibrate);
 
-  FastLED.show();
-}
-
-void i2cOnRequest() {
-  Wire.write(carreFouille);
-}
-
-void i2cOnReceive(int length) {
-  processReceive(length, true);
-}
-
-void processReceive(int length, boolean wire) {
-  char c = wire ? Wire.read() : Serial.read();
-  switch (c) {
-    // demande de valeur du carré de fouille (only Serial)
-    case 'F':
-      Serial.print("F: 0x0");
-      Serial.println(carreFouille, HEX);
-      break;
-
-    // changement de couleur du stock
-    case 'S':
-      if (length < 7) {
-#if defined(DEBUG)
-        Serial.print("Pas assez de bits reçus pour le stock");
-#endif
-        break;
-      }
-      for (uint8_t i = 0; i < 6; i++) {
-        c = wire ? Wire.read() : Serial.read();
-        switch (c) {
-          case 'R': couleurStock(i, CRGB::Red); break;
-          case 'G': couleurStock(i, CRGB::Green); break;
-          case 'B': couleurStock(i, CRGB::Blue); break;
-          case '?': couleurStock(i, CRGB::Yellow); break;
-          default: couleurStock(i, CRGB::Black); break;
-        }
-      }
-      if (!wire) {
-        Serial.println("S: OK");
-      }
-      break;
-
-    // Changement de couleur des ventouses
-    case 'V':
-      if (length < 3) {
-#if defined(DEBUG)
-        Serial.print("Pas assez de bits reçus pour les ventouses");
-#endif
-        break;
-      }
-      for (uint8_t i = 0; i < 2; i++) {
-        c = wire ? Wire.read() : Serial.read();
-        switch (c) {
-          case 'R': couleurVentouse(i, CRGB::Red); break;
-          case 'G': couleurVentouse(i, CRGB::Green); break;
-          case 'B': couleurVentouse(i, CRGB::Blue); break;
-          case '?': couleurVentouse(i, CRGB::Yellow); break;
-          default: couleurVentouse(i, CRGB::Black); break;
-        }
-      }
-      if (!wire) {
-        Serial.println("V: OK");
-      }
-      break;
-  }
-}
-
-#if defined(SCREEN)
-void printCarreFouilleScreen(int value, String name) {
-  display.clearDisplay();
-
-  display.setTextSize(2);             // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE);        // Draw white text
-  display.setCursor(0,0);             // Start at top-left corner
-  display.println(name);
-  display.println(value, DEC);
-
-  display.display();
-}
-#endif
-
-void readCarreFouille() {
-  static int lastAnalogValue;
-  static int cpt;
-
-  int analogValue = analogRead(A0);
-  int diff = abs(analogValue - lastAnalogValue);
-
-  if (diff < 5) {
-    cpt++;
-  } else {
-    cpt = 0;
-  }
-  lastAnalogValue = analogValue;
-
-  if (cpt > 3) {
-    cpt = 3;
-    if (between(analogValue, 327)) {
-#if defined(SCREEN)      
-      printCarreFouilleScreen(analogValue, "VIOLET");
-#endif
-      carreFouille = VIOLET;
-      couleurCarreFouille(CRGB::Purple);
-    
-    } else if (between(analogValue, 511)) {
-#if defined(SCREEN)       
-      printCarreFouilleScreen(analogValue, "JAUNE");
-#endif     
-      carreFouille = JAUNE;
-      couleurCarreFouille(CRGB::Yellow);
-    
-    } else if (between(analogValue, 843)) {
-#if defined(SCREEN)     
-      printCarreFouilleScreen(analogValue, "INTERDIT");
-#endif
-      carreFouille = INTERDIT;
-      couleurCarreFouille(CRGB::Red);
-    
-    } else {
-#if defined(SCREEN)       
-      printCarreFouilleScreen(analogValue, "INCONNU");
-#endif
-      carreFouille = INCONNU;
-      couleurCarreFouille(CRGB::Black);
+    if(ps2x.ButtonPressed(PSB_PAD_UP)) {
+      vibrate += 10;
     }
-  
-  } else {
-#if defined(SCREEN) 
-    printCarreFouilleScreen(analogValue, "INCONNU");
-#endif
-    carreFouille = INCONNU;
-    couleurCarreFouille(CRGB::Black);
+    if(ps2x.ButtonPressed(PSB_PAD_DOWN)) {
+      vibrate -= 10;
+    }
+
+    if(ps2x.ButtonPressed(PSB_START)) {
+      color = CRGB::Black;
+    }
+    if(ps2x.ButtonPressed(PSB_CROSS)) {
+      color = CRGB::Blue;
+    }
+    if(ps2x.ButtonPressed(PSB_SQUARE)) {
+      color = CRGB::Red;
+    }
+    if(ps2x.ButtonPressed(PSB_TRIANGLE)) {
+      color = CRGB::Green;
+    }
+    if(ps2x.ButtonPressed(PSB_CIRCLE)) {
+      color = CRGB::Purple;
+    }
+
+    int ly = 127 - ps2x.Analog(PSS_LY);
+    int rx = 128 - ps2x.Analog(PSS_RX);
+
+    left = map(ly - rx, -256, 255, -128, 127);
+    right = map(ly + rx, -256, 255, -128, 127);
+
+    #if defined(SCREEN)
+      display.clearDisplay();
+
+      display.setTextSize(1);             // Normal 1:1 pixel scale
+      display.setTextColor(SSD1306_WHITE);// Draw white text
+      display.setCursor(0,0);             // Start at top-left corner
+      display.print("LY   : ");
+      display.println(ly);
+      display.print("RX   : ");
+      display.println(rx);
+      display.print("Vib. : ");
+      display.println(vibrate);
+      display.print("M L  : ");
+      display.println(left);
+      display.print("M R  : ");
+      display.println(right);
+
+      display.display();
+    #endif
+
+    motors.generateMouvement(left, right);
   }
-}
-
-void couleurCarreFouille(CRGB couleur) {
-  ledsBandeau1[0] = couleur;
-}
-
-void couleurVentouse(uint8_t index, CRGB couleur) {
-#if NB_BANDEAU_LED == 1
-  ledsBandeau1[index + NUM_LEDS_FOUILLE + NUM_LEDS_STOCK] = couleur;
-#elif NB_BANDEAU_LED == 2
-  ledsBandeau2[index + NUM_LEDS_STOCK] = couleur;
-#else
-  ledsBandeau3[index] = couleur;
-#endif
-}
-
-void couleurStock(uint8_t index, CRGB couleur) {
-#if NB_BANDEAU_LED == 1
-  ledsBandeau1[index + NUM_LEDS_FOUILLE] = couleur;
-#else
-  ledsBandeau2[index] = couleur;
-#endif
-}
-
-boolean between(int value, int medium) {
-  return (value >= medium - 10 && value <= medium + 10);
 }
