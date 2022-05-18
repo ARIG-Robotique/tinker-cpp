@@ -1,0 +1,72 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/include",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/src",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/lib/MD22",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/lib/I2CUtils",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/lib/config",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/PS2X",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/Adafruit SSD1306",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/Adafruit GFX Library",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/Adafruit BusIO",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/FastLED/src",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/cores/arduino",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/variants/standard",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/include",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/src",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/lib/MD22",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/lib/I2CUtils",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/lib/config",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/PS2X",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/Adafruit SSD1306",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/Adafruit GFX Library",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/Adafruit BusIO",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                    "/home/gregorydepuille@sglk.local/workspaces/arig-wksp/cpp-micro/tinker-cpp/.pio/libdeps/duemilanove/FastLED/src",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/cores/arduino",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/variants/standard",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                    "/home/gregorydepuille@sglk.local/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60000",
+                "ARDUINO_AVR_DUEMILANOVE",
+                "F_CPU=16000000L",
+                "ARDUINO_ARCH_AVR",
+                "ARDUINO=10808",
+                "__AVR_ATmega328P__",
+                ""
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "compilerPath": "/home/gregorydepuille@sglk.local/.platformio/packages/toolchain-atmelavr/bin/avr-gcc",
+            "compilerArgs": [
+                "-mmcu=atmega328p",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
