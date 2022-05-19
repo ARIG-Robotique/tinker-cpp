@@ -24,7 +24,6 @@ PS2X ps2x; // Static instantiation of the library
 
 int psxErrorState = 0;
 byte type = 0;
-byte vibrate = 0;
 
 #if defined(SCREEN)
   // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
@@ -73,36 +72,12 @@ void setup() {
   #endif
   Wire.begin();
   byte nbDevices = i2cUtils.scan();
-
   #if defined(DEBUG)
     Serial.print(" * Nb I2C devices : ");
     Serial.println(nbDevices, DEC);
   #endif
 
-  #if defined(LEDS)
-    #if defined(DEBUG)
-      Serial.println(" - Configuration LEDs");
-    #endif
-
-    FastLED.addLeds<NEOPIXEL, 6>(leds, NUM_LEDS);
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CRGB::Green;
-      FastLED.show();
-      FastLED.delay(10);
-    }
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CRGB::Black;
-      FastLED.show();
-      FastLED.delay(10);
-    }
-  #endif 
-
-  #if defined(DEBUG)
-    Serial.println(" - Configuration des I/O");
-  #endif
-  pinMode(LED_BUILTIN, OUTPUT);
-
-  #if defined(SCREEN)
+#if defined(SCREEN)
     #if defined(DEBUG)
       Serial.println(" - Configuration Ecran OLED");
     #endif
@@ -130,11 +105,30 @@ void setup() {
     // Show initial display buffer contents on the screen --
     // the library initializes this with an Adafruit splash screen.
     display.display();
-    delay(1000); // Pause for 2 seconds
-
-    // Clear the buffer
-    display.clearDisplay();
   #endif
+
+  #if defined(LEDS)
+    #if defined(DEBUG)
+      Serial.println(" - Configuration LEDs");
+    #endif
+
+    FastLED.addLeds<NEOPIXEL, 6>(leds, NUM_LEDS);
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Green;
+      FastLED.show();
+      FastLED.delay(10);
+    }
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Black;
+      FastLED.show();
+      FastLED.delay(10);
+    }
+  #endif 
+
+  #if defined(DEBUG)
+    Serial.println(" - Configuration des I/O");
+  #endif
+  pinMode(LED_BUILTIN, OUTPUT);
 
   #if defined(DEBUG)
     Serial.println(" - Configuration MD22");
@@ -206,14 +200,7 @@ void loop() {
   }
 
   EVERY_N_MILLISECONDS(50) {
-    ps2x.read_gamepad(false, vibrate);
-
-    if(ps2x.ButtonPressed(PSB_PAD_UP)) {
-      vibrate += 10;
-    }
-    if(ps2x.ButtonPressed(PSB_PAD_DOWN)) {
-      vibrate -= 10;
-    }
+    ps2x.read_gamepad(false, 0);
 
     if(ps2x.ButtonPressed(PSB_START)) {
       color = CRGB::Black;
@@ -231,11 +218,25 @@ void loop() {
       color = CRGB::Purple;
     }
 
-    int ly = 127 - ps2x.Analog(PSS_LY);
-    int rx = 128 - ps2x.Analog(PSS_RX);
+    int speed = map(ps2x.Analog(PSS_LY), 255, 0, -100, 100);
+    if (speed < 2 && speed > -2) {
+      speed = 0;
+    }
+    int turn = map(ps2x.Analog(PSS_RX), 0, 255, 100, -100);
+    if (turn < 2 && turn > -2) {
+      turn = 0;
+    }
 
-    left = map(ly - rx, -256, 255, -128, 127);
-    right = map(ly + rx, -256, 255, -128, 127);
+    if (turn == 0) {
+      left = speed * 127 / 100;
+      right = left;
+    } else if (speed == 0) {
+      left =  -turn * 127 / 100;
+      right = -left;
+    } else {
+      left = (((speed - turn) / 2) * 127) / 100;
+      right = (((speed + turn) / 2) * 127) / 100;
+    }
 
     #if defined(SCREEN)
       display.clearDisplay();
@@ -243,15 +244,16 @@ void loop() {
       display.setTextSize(1);             // Normal 1:1 pixel scale
       display.setTextColor(SSD1306_WHITE);// Draw white text
       display.setCursor(0,0);             // Start at top-left corner
-      display.print("LY   : ");
-      display.println(ly);
-      display.print("RX   : ");
-      display.println(rx);
-      display.print("Vib. : ");
-      display.println(vibrate);
-      display.print("M L  : ");
+      display.print("Speed : ");
+      display.print(speed);
+      display.println(" %");
+      display.print("Turn  : ");
+      display.print(turn);
+      display.println(" %");
+      display.println("");
+      display.print("M L   : ");
       display.println(left);
-      display.print("M R  : ");
+      display.print("M R   : ");
       display.println(right);
 
       display.display();
