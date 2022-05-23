@@ -4,14 +4,9 @@
 #include <I2CUtils.h>
 #include <MD22.h>
 #include <PS2X_lib.h>
-
-#if defined(SCREEN)
-  #include <Adafruit_GFX.h>
-  #include <Adafruit_SSD1306.h>
-#endif
-#if defined(LEDS)
-  #include <FastLED.h>
-#endif
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <FastLED.h>
 
 // PSX Configuration
 #define PS2_DAT        9  //14    
@@ -25,39 +20,58 @@ PS2X ps2x; // Static instantiation of the library
 int psxErrorState = 0;
 byte type = 0;
 
-#if defined(SCREEN)
-  // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-  #define SCREEN_WIDTH 128 // OLED display width, in pixels
-  #define SCREEN_HEIGHT 64 // OLED display height, in pixels
-  #define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
-  #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
-  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-#endif
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#if defined(LEDS)
-  #define SMALL_RING 24
-  #define LARGE_RING 36
+#define SMALL_RING 24
+#define LARGE_RING 36
 
-  #define NUM_LEDS (SMALL_RING + LARGE_RING)
+#define NUM_LEDS (SMALL_RING + LARGE_RING)
 
-  CRGB leds[NUM_LEDS];
-#endif
+CRGB leds[NUM_LEDS];
+uint8_t brightness = 50;
 
 // Config moteurs
-#define MD22_ADD_BOARD				0x58
-#define LEFT_MOTOR					ASSIGN_MOTOR_1
-#define RIGHT_MOTOR					ASSIGN_MOTOR_2
-MD22 motors = MD22(MD22_ADD_BOARD, MODE_1, 0);
+#define PCT_MOTORS          65
+#define MD22_ADD_BOARD			0x58
+#define LEFT_MOTOR					ASSIGN_MOTOR_2
+#define RIGHT_MOTOR					ASSIGN_MOTOR_1
+MD22 motors = MD22(MD22_ADD_BOARD, MODE_1, 100);
 
 int left = 0;
 int right = 0;
+int speed = 0;
+int turn = 0;
 
 // Alternate buildin LED
 boolean alt = false;
-CRGB color = CRGB::Black;
 
-// Prototypes for functions defined at the end of this file //
-// -------------------------------------------------------- //
+void modifyBrightness(uint8_t stepValue);
+
+void addGlitter(fract8 v);
+
+void rainbow();
+void rainbowWithGlitter();
+void confetti();
+void sinelon();
+void juggle();
+void bpm();
+void animMoveTinker();
+
+// List of patterns to cycle through.  Each is defined as a separate function below.
+#define FRAMES_PER_SECOND 120
+#define FASTLED_DELAY (1000 / FRAMES_PER_SECOND)
+#define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
+typedef void (*SimplePatternList[])();
+SimplePatternList gPatterns = {animMoveTinker, rainbow, rainbowWithGlitter, confetti, sinelon, juggle, bpm};
+
+int8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
+uint8_t gHue = 0;                  // rotating "base color" used by many of the patterns
+
 
 // Configuration //
 // ------------- //
@@ -66,6 +80,13 @@ void setup() {
     Serial.begin(115200);
     Serial.println("Setup");
   #endif
+
+  #if defined(DEBUG)
+    Serial.println(" - Configuration LEDs");
+  #endif
+
+  FastLED.addLeds<NEOPIXEL, 6>(leds, NUM_LEDS);
+  FastLED.setBrightness(brightness);
 
   #if defined(DEBUG)
     Serial.println(" - Configuration I2C");
@@ -77,53 +98,38 @@ void setup() {
     Serial.println(nbDevices, DEC);
   #endif
 
-#if defined(SCREEN)
-    #if defined(DEBUG)
-      Serial.println(" - Configuration Ecran OLED");
-    #endif
-
-    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false)) {
-      #if defined(DEBUG)
-        Serial.println(F("SSD1306 allocation failed"));
-      #endif
-    
-      #if defined(LEDS)
-        while(1) {
-          for (int i = 0; i < NUM_LEDS; i++) {
-            leds[i] = alt ? CRGB::DarkRed : CRGB::Black;
-          }
-          alt = !alt;
-          FastLED.show();
-          FastLED.delay(1000);
-        } 
-      #else
-        digitalWrite(LED_BUILTIN, HIGH);
-        while(true);
-      #endif
-    }
-
-    // Show initial display buffer contents on the screen --
-    // the library initializes this with an Adafruit splash screen.
-    display.display();
+  #if defined(DEBUG)
+    Serial.println(" - Configuration Ecran OLED");
   #endif
 
-  #if defined(LEDS)
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS, false, false)) {
     #if defined(DEBUG)
-      Serial.println(" - Configuration LEDs");
+      Serial.println(F("SSD1306 allocation failed"));
     #endif
+  
+    while(1) {
+      for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = alt ? CRGB::DarkRed : CRGB::Black;
+      }
+      alt = !alt;
+      FastLED.show();
+      FastLED.delay(1000);
+    } 
+  }
 
-    FastLED.addLeds<NEOPIXEL, 6>(leds, NUM_LEDS);
-    for (int i = 0; i < NUM_LEDS; i++) {
+  // Show initial display buffer contents on the screen --
+  // the library initializes this with an Adafruit splash screen.
+  display.display();
+
+  // Show a small animation on LEDs
+  for (int i = 0; i < NUM_LEDS + 20; i++) {
+    fadeToBlackBy(leds, NUM_LEDS, 60);
+    if (i < NUM_LEDS) {
       leds[i] = CRGB::Green;
-      FastLED.show();
-      FastLED.delay(10);
     }
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CRGB::Black;
-      FastLED.show();
-      FastLED.delay(10);
-    }
-  #endif 
+    FastLED.show();
+    FastLED.delay(FASTLED_DELAY);
+  }
 
   #if defined(DEBUG)
     Serial.println(" - Configuration des I/O");
@@ -133,6 +139,7 @@ void setup() {
   #if defined(DEBUG)
     Serial.println(" - Configuration MD22");
   #endif
+  motors.init();
   motors.assignMotors(LEFT_MOTOR, RIGHT_MOTOR);
   motors.stopAll();
 
@@ -189,76 +196,156 @@ void setup() {
 // --------- //
 void loop() {
 
-  EVERY_N_SECONDS(1) {
-    #if defined(LEDS)
-      for (int i = 0; i < NUM_LEDS; i++) {
-        leds[i] = alt ? color : CRGB::Black;
-      }
-      alt = !alt;
-      FastLED.show();
-    #endif
+  // do some periodic updates
+  EVERY_N_MILLISECONDS(20) { 
+     // slowly cycle the "base color" through the rainbow
+    gHue++; 
   }
 
   EVERY_N_MILLISECONDS(50) {
     ps2x.read_gamepad(false, 0);
 
-    if(ps2x.ButtonPressed(PSB_START)) {
-      color = CRGB::Black;
+    if(ps2x.ButtonPressed(PSB_PAD_LEFT)) {
+      if (gCurrentPatternNumber - 1 >= 0) {
+        gCurrentPatternNumber--;
+      }
     }
-    if(ps2x.ButtonPressed(PSB_CROSS)) {
-      color = CRGB::Blue;
-    }
-    if(ps2x.ButtonPressed(PSB_SQUARE)) {
-      color = CRGB::Red;
-    }
-    if(ps2x.ButtonPressed(PSB_TRIANGLE)) {
-      color = CRGB::Green;
-    }
-    if(ps2x.ButtonPressed(PSB_CIRCLE)) {
-      color = CRGB::Purple;
+    if(ps2x.ButtonPressed(PSB_PAD_RIGHT)) {
+      if (gCurrentPatternNumber + 1 < ARRAY_SIZE(gPatterns) - 1) {
+        gCurrentPatternNumber++;
+      }
     }
 
-    int speed = map(ps2x.Analog(PSS_LY), 255, 0, -100, 100);
+    if (ps2x.ButtonPressed(PSB_PAD_UP)) {
+      modifyBrightness(5);
+    }
+    if (ps2x.ButtonPressed(PSB_PAD_DOWN)) {
+      modifyBrightness(-5);
+    }
+
+    speed = map(ps2x.Analog(PSS_LY), 255, 0, -PCT_MOTORS, PCT_MOTORS);
     if (speed < 2 && speed > -2) {
       speed = 0;
     }
-    int turn = map(ps2x.Analog(PSS_RX), 0, 255, 100, -100);
+    turn = map(ps2x.Analog(PSS_RX), 0, 255, PCT_MOTORS, -PCT_MOTORS);
     if (turn < 2 && turn > -2) {
       turn = 0;
     }
 
-    if (turn == 0) {
-      left = speed * 127 / 100;
-      right = left;
-    } else if (speed == 0) {
-      left =  -turn * 127 / 100;
-      right = -left;
-    } else {
-      left = (((speed - turn) / 2) * 127) / 100;
-      right = (((speed + turn) / 2) * 127) / 100;
-    }
+    left = ((speed - turn) * 127) / 100;
+    right = ((speed + turn) * 127) / 100;
 
-    #if defined(SCREEN)
-      display.clearDisplay();
+    display.clearDisplay();
 
-      display.setTextSize(1);             // Normal 1:1 pixel scale
-      display.setTextColor(SSD1306_WHITE);// Draw white text
-      display.setCursor(0,0);             // Start at top-left corner
-      display.print("Speed : ");
-      display.print(speed);
-      display.println(" %");
-      display.print("Turn  : ");
-      display.print(turn);
-      display.println(" %");
-      display.println("");
-      display.print("M L   : ");
-      display.println(left);
-      display.print("M R   : ");
-      display.println(right);
+    display.setTextSize(1);             // Normal 1:1 pixel scale
+    display.setTextColor(SSD1306_WHITE);// Draw white text
+    display.setCursor(0,0);             // Start at top-left corner
+    display.print("Speed : ");
+    display.print(speed);
+    display.println(" %");
+    display.print("Turn  : ");
+    display.print(turn);
+    display.println(" %");
+    display.println("");
+    display.print("M L   : ");
+    display.println(left);
+    display.print("M R   : ");
+    display.println(right);
 
-      display.display();
-    #endif
+    display.display();
 
     motors.generateMouvement(left, right);
+  }
+
+  gPatterns[gCurrentPatternNumber]();
+  FastLED.show();
+  FastLED.delay(FASTLED_DELAY);
+
+}
+
+// Prototypes implementations //
+// -------------------------- //
+
+void modifyBrightness(uint8_t stepValue) {
+  brightness += stepValue;
+  FastLED.setBrightness(brightness);
+}
+
+void rainbow() {
+  // FastLED's built-in rainbow generator
+  fill_rainbow(leds, NUM_LEDS, gHue, 7);
+}
+
+void rainbowWithGlitter() {
+  // built-in FastLED rainbow, plus some random sparkly glitter
+  rainbow();
+  addGlitter(80);
+}
+
+void addGlitter(fract8 chanceOfGlitter) {
+  if (random8() < chanceOfGlitter) {
+    leds[random16(NUM_LEDS)] += CRGB::White;
+  }
+}
+
+void confetti() {
+  // random colored speckles that blink in and fade smoothly
+  fadeToBlackBy(leds, NUM_LEDS, 10);
+  int pos = random16(NUM_LEDS);
+  leds[pos] += CHSV(gHue + random8(64), 200, 255);
+}
+
+void sinelon() {
+  // a colored dot sweeping back and forth, with fading trails
+  fadeToBlackBy(leds, NUM_LEDS, 20);
+  int pos = beatsin16(13, 0, NUM_LEDS - 1);
+  leds[pos] += CHSV(gHue, 255, 192);
+}
+
+void bpm() {
+  // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+  uint8_t BeatsPerMinute = 62;
+  CRGBPalette16 palette = PartyColors_p;
+  uint8_t beat = beatsin8(BeatsPerMinute, 64, 255);
+  for (int i = 0; i < NUM_LEDS; i++) { //9948
+    leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  }
+}
+
+void juggle() {
+  // eight colored dots, weaving in and out of sync with each other
+  fadeToBlackBy(leds, NUM_LEDS, 20);
+  byte dothue = 0;
+  for (int i = 0; i < 8; i++) {
+    leds[beatsin16(i + 7, 0, NUM_LEDS - 1)] |= CHSV(dothue, 200, 255);
+    dothue += 32;
+  }
+}
+
+void animMoveTinker() {
+  fadeToBlackBy(leds, NUM_LEDS, 20);
+
+  // Small ring speed value
+  uint8_t nbLeds = map(abs(speed), 0, 100, 0, SMALL_RING);
+  if (speed > 0) {
+    for (int i = 0 ; i < nbLeds ; i++) {
+      leds[i] = CHSV(gHue, 255, 255);
+    }
+  } else if (speed < 0) {
+    for (int i = SMALL_RING - 1 ; i >= SMALL_RING - nbLeds ; i--) {
+      leds[i] = CHSV(gHue, 255, 255);
+    }
+  }
+
+  // Large ring turn motor value
+  nbLeds = map(abs(turn), 0, 100, 0, LARGE_RING);
+  if (turn > 0) {
+    for (int i = 0 ; i < nbLeds ; i++) {
+      leds[i + SMALL_RING] = CHSV(gHue, 255, 255);
+    }
+  } else if (turn < 0) {
+    for (int i = SMALL_RING + LARGE_RING - 1 ; i >= SMALL_RING + LARGE_RING - nbLeds ; i--) {
+      leds[i] = CHSV(gHue, 255, 255);
+    }
   }
 }
