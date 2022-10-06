@@ -228,7 +228,7 @@ void loop() {
     if (speed < 2 && speed > -2) {
       speed = 0;
     }
-    turn = map(ps2x.Analog(PSS_RX), 0, 255, PCT_MOTORS, -PCT_MOTORS);
+    turn = map(ps2x.Analog(PSS_LX), 0, 255, PCT_MOTORS, -PCT_MOTORS);
     if (turn < 2 && turn > -2) {
       turn = 0;
     }
