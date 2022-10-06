@@ -61,17 +61,18 @@ void sinelon();
 void juggle();
 void bpm();
 void animMoveTinker();
+void guilleLed();
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
 #define FRAMES_PER_SECOND 120
 #define FASTLED_DELAY (1000 / FRAMES_PER_SECOND)
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = {animMoveTinker, rainbow, rainbowWithGlitter, confetti, sinelon, juggle, bpm};
+SimplePatternList gPatterns = {guilleLed, animMoveTinker, rainbow, rainbowWithGlitter, confetti, sinelon, juggle, bpm};
 
 int8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0;                  // rotating "base color" used by many of the patterns
-
+int8_t idxLed =0;
 
 // Configuration //
 // ------------- //
@@ -257,6 +258,12 @@ void loop() {
     motors.generateMouvement(left, right);
   }
 
+  EVERY_N_MILLISECONDS(300){
+    idxLed++;
+    if(idxLed>NUM_LEDS-1){
+      idxLed=0;
+    }
+  }
   gPatterns[gCurrentPatternNumber]();
   FastLED.show();
   FastLED.delay(FASTLED_DELAY);
@@ -348,4 +355,12 @@ void animMoveTinker() {
       leds[i] = CHSV(gHue, 255, 255);
     }
   }
+}
+
+void guilleLed() {
+  //FastLED.clear();
+  fadeToBlackBy(leds, NUM_LEDS, 3);
+  // Turn the LED on, then pause
+  leds[idxLed] = CRGB::Red;
+
 }
