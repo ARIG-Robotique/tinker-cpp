@@ -7,6 +7,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <FastLED.h>
+#include <Adafruit_PWMServoDriver.h>
 
 // PSX Configuration
 #define PS2_DAT        9  //14    
@@ -47,6 +48,13 @@ int right = 0;
 int speed = 0;
 int turn = 0;
 
+// Config Servos
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+#define SERVOMIN  150 // This is the 'minimum' pulse length count (out of 4096)
+#define SERVOMAX  600 // This is the 'maximum' pulse length count (out of 4096)
+#define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
+uint8_t servonum = 3;
+
 // Alternate buildin LED
 boolean alt = false;
 
@@ -62,6 +70,7 @@ void juggle();
 void bpm();
 void animMoveTinker();
 void guilleLed();
+void BougeServo();
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
 #define FRAMES_PER_SECOND 120
@@ -191,6 +200,12 @@ void setup() {
   ps2x.read_gamepad(true, 100); 
   delay(1000);
   ps2x.read_gamepad(false, 0); 
+
+  // Setup Servos
+  pwm.begin();
+  pwm.setOscillatorFrequency(27000000);
+  pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
+  
 }
 
 // Main loop //
@@ -206,6 +221,9 @@ void loop() {
   EVERY_N_MILLISECONDS(50) {
     ps2x.read_gamepad(false, 0);
 
+    if(ps2x.ButtonPressed(PSB_SELECT)) {
+      BougeServo();
+    }
     if(ps2x.ButtonPressed(PSB_PAD_LEFT)) {
       if (gCurrentPatternNumber - 1 >= 0) {
         gCurrentPatternNumber--;
@@ -363,4 +381,18 @@ void guilleLed() {
   // Turn the LED on, then pause
   leds[idxLed] = CRGB::Red;
 
+}
+
+// Faire bouger un servo
+void BougeServo() {
+  for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
+      pwm.setPWM(servonum, 0, pulselen);
+    }
+
+    delay(500);
+    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
+      pwm.setPWM(servonum, 0, pulselen);
+    }
+
+    delay(500);
 }
