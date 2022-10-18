@@ -50,10 +50,13 @@ int turn = 0;
 
 // Config Servos
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-#define SERVOMIN  150 // This is the 'minimum' pulse length count (out of 4096)
-#define SERVOMAX  600 // This is the 'maximum' pulse length count (out of 4096)
 #define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
+#define USSERVOMIN  600 // µ-second
+#define USSERVOMAX  2400 // µ-second
+#define NBSERVO 16 // 0 to 15
 uint8_t servonum = 3;
+int ValueServo[NBSERVO];
+uint8_t DeltaRegServo = 100; // incrément de reglage servo
 
 // Alternate buildin LED
 boolean alt = false;
@@ -205,6 +208,11 @@ void setup() {
   pwm.begin();
   pwm.setOscillatorFrequency(27000000);
   pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
+  delay(10);
+  for (int i=0 ; i<NBSERVO ; i++) {
+    ValueServo[i]=1500;
+    pwm.writeMicroseconds(servonum, ValueServo[i]);
+  }
   
 }
 
@@ -223,6 +231,41 @@ void loop() {
 
     if(ps2x.ButtonPressed(PSB_SELECT)) {
       BougeServo();
+    }
+    if(ps2x.ButtonPressed(PSB_TRIANGLE)) {
+      if(DeltaRegServo==100){ 
+        DeltaRegServo=10;
+      } else if(DeltaRegServo==10) {
+        DeltaRegServo=1;
+      } else {
+        DeltaRegServo=100;
+      }
+    }
+    if(ps2x.ButtonPressed(PSB_R1)) {
+      servonum++;
+      if(servonum>=NBSERVO){
+        servonum=0;
+      }
+    }
+    if(ps2x.ButtonPressed(PSB_L1)) {
+      servonum--;
+      if(servonum>=NBSERVO){ //because Uint
+        servonum=NBSERVO-1;
+      }
+    }
+    if(ps2x.ButtonPressed(PSB_R2)) {
+      ValueServo[servonum]+=DeltaRegServo;
+      if(ValueServo[servonum]>USSERVOMAX){
+        ValueServo[servonum]=USSERVOMAX;
+      }
+      pwm.writeMicroseconds(servonum, ValueServo[servonum]);
+    }
+    if(ps2x.ButtonPressed(PSB_L2)) {
+      ValueServo[servonum]-=DeltaRegServo;
+      if(ValueServo[servonum]<USSERVOMIN){
+        ValueServo[servonum]=USSERVOMIN;
+      }
+      pwm.writeMicroseconds(servonum, ValueServo[servonum]);
     }
     if(ps2x.ButtonPressed(PSB_PAD_LEFT)) {
       if (gCurrentPatternNumber - 1 >= 0) {
@@ -259,17 +302,21 @@ void loop() {
     display.setTextSize(1);             // Normal 1:1 pixel scale
     display.setTextColor(SSD1306_WHITE);// Draw white text
     display.setCursor(0,0);             // Start at top-left corner
-    display.print("Speed : ");
+    display.print("Spd: ");
     display.print(speed);
-    display.println(" %");
-    display.print("Turn  : ");
-    display.print(turn);
-    display.println(" %");
-    display.println("");
-    display.print("M L   : ");
+    display.print(" %  ML: ");
     display.println(left);
-    display.print("M R   : ");
+    display.print("Trn: ");
+    display.print(turn);
+    display.print(" %  MR: ");
     display.println(right);
+    display.println("");
+    display.print("N.serv : ");
+    display.println(servonum);
+    display.print("Value  : ");
+    display.println(ValueServo[servonum]);
+    display.print("D : ");
+    display.println(DeltaRegServo);
 
     display.display();
 
@@ -383,16 +430,24 @@ void guilleLed() {
 
 }
 
-// Faire bouger un servo
+// Faire bouger un servo en essui-glace de butée à butée puis retour position init
 void BougeServo() {
-  for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
-      pwm.setPWM(servonum, 0, pulselen);
+  for (uint16_t i = ValueServo[servonum]; i < USSERVOMAX; i+=DeltaRegServo) {
+    pwm.writeMicroseconds(servonum, i);
+  }
+  pwm.writeMicroseconds(servonum, USSERVOMAX);
+  delay(500);
+  for (uint16_t i = USSERVOMAX; i > USSERVOMIN; i-=DeltaRegServo) {
+    pwm.writeMicroseconds(servonum, i);
+  }
+  pwm.writeMicroseconds(servonum, USSERVOMIN);
+  delay(500);
+  for (uint16_t i = USSERVOMIN; i < ValueServo[servonum]; i+=DeltaRegServo) {
+    if (i>ValueServo[servonum]){
+      i=ValueServo[servonum];
     }
-
-    delay(500);
-    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
-      pwm.setPWM(servonum, 0, pulselen);
-    }
-
-    delay(500);
+    pwm.writeMicroseconds(servonum, i);
+  }
+  pwm.writeMicroseconds(servonum, ValueServo[servonum]);
+  delay(500);
 }
