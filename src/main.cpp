@@ -51,12 +51,12 @@ int turn = 0;
 // Config Servos
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 #define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
-#define USSERVOMIN  600 // µ-second
-#define USSERVOMAX  2400 // µ-second
+#define USSERVOMIN  500 // µ-second min
+#define USSERVOMAX  2150 // µ-second max
 #define NBSERVO 16 // 0 to 15
 uint8_t servonum = 3;
-int ValueServo[NBSERVO];
-uint8_t DeltaRegServo = 100; // incrément de reglage servo
+uint16_t valueServo[NBSERVO];
+uint8_t deltaRegServo = 100; // incrément de reglage servo
 
 // Alternate buildin LED
 boolean alt = false;
@@ -210,8 +210,8 @@ void setup() {
   pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
   delay(10);
   for (int i=0 ; i<NBSERVO ; i++) {
-    ValueServo[i]=1500;
-    pwm.writeMicroseconds(servonum, ValueServo[i]);
+    valueServo[i]=1500;
+    pwm.writeMicroseconds(servonum, valueServo[i]);
   }
   
 }
@@ -228,17 +228,17 @@ void loop() {
 
   EVERY_N_MILLISECONDS(50) {
     ps2x.read_gamepad(false, 0);
-
+    // actions sur servos
     if(ps2x.ButtonPressed(PSB_SELECT)) {
       BougeServo();
     }
     if(ps2x.ButtonPressed(PSB_TRIANGLE)) {
-      if(DeltaRegServo==100){ 
-        DeltaRegServo=10;
-      } else if(DeltaRegServo==10) {
-        DeltaRegServo=1;
+      if(deltaRegServo==100){ 
+        deltaRegServo=10;
+      } else if(deltaRegServo==10) {
+        deltaRegServo=1;
       } else {
-        DeltaRegServo=100;
+        deltaRegServo=100;
       }
     }
     if(ps2x.ButtonPressed(PSB_R1)) {
@@ -254,19 +254,20 @@ void loop() {
       }
     }
     if(ps2x.ButtonPressed(PSB_R2)) {
-      ValueServo[servonum]+=DeltaRegServo;
-      if(ValueServo[servonum]>USSERVOMAX){
-        ValueServo[servonum]=USSERVOMAX;
+      valueServo[servonum]+=deltaRegServo;
+      if(valueServo[servonum]>USSERVOMAX){
+        valueServo[servonum]=USSERVOMAX;
       }
-      pwm.writeMicroseconds(servonum, ValueServo[servonum]);
+      pwm.writeMicroseconds(servonum, valueServo[servonum]);
     }
     if(ps2x.ButtonPressed(PSB_L2)) {
-      ValueServo[servonum]-=DeltaRegServo;
-      if(ValueServo[servonum]<USSERVOMIN){
-        ValueServo[servonum]=USSERVOMIN;
+      valueServo[servonum]-=deltaRegServo;
+      if(valueServo[servonum]<USSERVOMIN){
+        valueServo[servonum]=USSERVOMIN;
       }
-      pwm.writeMicroseconds(servonum, ValueServo[servonum]);
+      pwm.writeMicroseconds(servonum, valueServo[servonum]);
     }
+    // actions sur LED
     if(ps2x.ButtonPressed(PSB_PAD_LEFT)) {
       if (gCurrentPatternNumber - 1 >= 0) {
         gCurrentPatternNumber--;
@@ -285,6 +286,7 @@ void loop() {
       modifyBrightness(-5);
     }
 
+    // actions sur moteurs
     speed = map(ps2x.Analog(PSS_LY), 255, 0, -PCT_MOTORS, PCT_MOTORS);
     if (speed < 2 && speed > -2) {
       speed = 0;
@@ -297,6 +299,9 @@ void loop() {
     left = ((speed - turn) * 127) / 100;
     right = ((speed + turn) * 127) / 100;
 
+    motors.generateMouvement(left, right);
+
+    // affichage
     display.clearDisplay();
 
     display.setTextSize(1);             // Normal 1:1 pixel scale
@@ -314,13 +319,11 @@ void loop() {
     display.print("N.serv : ");
     display.println(servonum);
     display.print("Value  : ");
-    display.println(ValueServo[servonum]);
+    display.println(valueServo[servonum]);
     display.print("D : ");
-    display.println(DeltaRegServo);
+    display.println(deltaRegServo);
 
     display.display();
-
-    motors.generateMouvement(left, right);
   }
 
   EVERY_N_MILLISECONDS(300){
@@ -432,22 +435,22 @@ void guilleLed() {
 
 // Faire bouger un servo en essui-glace de butée à butée puis retour position init
 void BougeServo() {
-  for (uint16_t i = ValueServo[servonum]; i < USSERVOMAX; i+=DeltaRegServo) {
+  for (uint16_t i = valueServo[servonum]; i < USSERVOMAX; i+=deltaRegServo) {
     pwm.writeMicroseconds(servonum, i);
   }
   pwm.writeMicroseconds(servonum, USSERVOMAX);
   delay(500);
-  for (uint16_t i = USSERVOMAX; i > USSERVOMIN; i-=DeltaRegServo) {
+  for (uint16_t i = USSERVOMAX; i > USSERVOMIN; i-=deltaRegServo) {
     pwm.writeMicroseconds(servonum, i);
   }
   pwm.writeMicroseconds(servonum, USSERVOMIN);
   delay(500);
-  for (uint16_t i = USSERVOMIN; i < ValueServo[servonum]; i+=DeltaRegServo) {
-    if (i>ValueServo[servonum]){
-      i=ValueServo[servonum];
+  for (uint16_t i = USSERVOMIN; i < valueServo[servonum]; i+=deltaRegServo) {
+    if (i>valueServo[servonum]){
+      i=valueServo[servonum];
     }
     pwm.writeMicroseconds(servonum, i);
   }
-  pwm.writeMicroseconds(servonum, ValueServo[servonum]);
+  pwm.writeMicroseconds(servonum, valueServo[servonum]);
   delay(500);
 }
