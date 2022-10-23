@@ -57,6 +57,8 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 uint8_t servonum = 3;
 uint16_t valueServo[NBSERVO];
 uint8_t deltaRegServo = 100; // incrément de reglage servo
+int valJoyDrtY = 0; // valeur de l'axe Y du joystick Droit (maper sur la plage de commande dervo)
+
 
 // Alternate buildin LED
 boolean alt = false;
@@ -267,6 +269,14 @@ void loop() {
       }
       pwm.writeMicroseconds(servonum, valueServo[servonum]);
     }
+    valJoyDrtY = map(ps2x.Analog(PSS_RY), 127, 0, 1000, 2000);
+    if (valJoyDrtY<USSERVOMIN){
+      valJoyDrtY=USSERVOMIN;
+    } else if (valJoyDrtY>USSERVOMAX){
+      valJoyDrtY=USSERVOMAX;
+    }    
+    pwm.writeMicroseconds(servonum, valJoyDrtY);
+
     // actions sur LED
     if(ps2x.ButtonPressed(PSB_PAD_LEFT)) {
       if (gCurrentPatternNumber - 1 >= 0) {
@@ -322,6 +332,8 @@ void loop() {
     display.println(valueServo[servonum]);
     display.print("D : ");
     display.println(deltaRegServo);
+    display.print("Joystick : ");
+    display.println(valJoyDrtY);
 
     display.display();
   }
