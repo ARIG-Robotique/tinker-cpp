@@ -449,11 +449,13 @@ void guilleLed() {
 void BougeServo() {
   for (uint16_t i = valueServo[servonum]; i < USSERVOMAX; i+=deltaRegServo) {
     pwm.writeMicroseconds(servonum, i);
+    delay(20);
   }
   pwm.writeMicroseconds(servonum, USSERVOMAX);
   delay(500);
   for (uint16_t i = USSERVOMAX; i > USSERVOMIN; i-=deltaRegServo) {
     pwm.writeMicroseconds(servonum, i);
+    delay(20);
   }
   pwm.writeMicroseconds(servonum, USSERVOMIN);
   delay(500);
@@ -462,6 +464,7 @@ void BougeServo() {
       i=valueServo[servonum];
     }
     pwm.writeMicroseconds(servonum, i);
+    delay(20);
   }
   pwm.writeMicroseconds(servonum, valueServo[servonum]);
   delay(500);
