@@ -10,11 +10,11 @@
 #include <Adafruit_PWMServoDriver.h>
 
 // PSX Configuration
-#define PS2_DAT        9  //14    
+#define PS2_DAT        9  //14
 #define PS2_CMD        10  //15
 #define PS2_SEL        11  //16
 #define PS2_CLK        12  //17
-#define pressures      false // analog reading of push-butttons 
+#define pressures      false // analog reading of push-butttons
 #define rumble         true // motor rumbling
 PS2X ps2x; // Static instantiation of the library
 
@@ -121,7 +121,7 @@ void setup() {
     #if defined(DEBUG)
       Serial.println(F("SSD1306 allocation failed"));
     #endif
-  
+
     while(1) {
       for (int i = 0; i < NUM_LEDS; i++) {
         leds[i] = alt ? CRGB::DarkRed : CRGB::Black;
@@ -129,7 +129,7 @@ void setup() {
       alt = !alt;
       FastLED.show();
       FastLED.delay(1000);
-    } 
+    }
   }
 
   // Show initial display buffer contents on the screen --
@@ -162,7 +162,7 @@ void setup() {
   do {
     #if defined(DEBUG)
       Serial.println(" - Configuration PS2 Remote controller");
-    #endif  
+    #endif
 
     psxErrorState = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
 
@@ -173,18 +173,18 @@ void setup() {
         Serial.print(pressures ? "true ; " : "false ; ");
         Serial.print("rumble = ");
         Serial.println(rumble ? "true]" : "false]");
-        
+
       } else if(psxErrorState == 1) {
         Serial.println("No controller found, check wiring, see readme.txt to enable debug. visit www.billporter.info for troubleshooting tips");
-      
+
       } else if(psxErrorState == 2) {
         Serial.println("Controller found but not accepting commands. see readme.txt to enable debug. Visit www.billporter.info for troubleshooting tips");
 
       } else if(psxErrorState == 3) {
         Serial.println("Controller refusing to enter Pressures mode, may not support it. ");
       }
-          
-      type = ps2x.readType(); 
+
+      type = ps2x.readType();
       switch(type) {
         case 0:
           Serial.println("Unknown Controller type found ");
@@ -202,9 +202,9 @@ void setup() {
     #endif
   } while (psxErrorState != 0);
 
-  ps2x.read_gamepad(true, 100); 
+  ps2x.read_gamepad(true, 100);
   delay(1000);
-  ps2x.read_gamepad(false, 0); 
+  ps2x.read_gamepad(false, 0);
 
   // Setup Servos
   pwm.begin();
@@ -215,7 +215,7 @@ void setup() {
     valueServo[i]=1500;
     pwm.writeMicroseconds(servonum, valueServo[i]);
   }
-  
+
 }
 
 // Main loop //
@@ -223,9 +223,9 @@ void setup() {
 void loop() {
 
   // do some periodic updates
-  EVERY_N_MILLISECONDS(20) { 
+  EVERY_N_MILLISECONDS(20) {
      // slowly cycle the "base color" through the rainbow
-    gHue++; 
+    gHue++;
   }
 
   EVERY_N_MILLISECONDS(50) {
@@ -235,7 +235,7 @@ void loop() {
       BougeServo();
     }
     if(ps2x.ButtonPressed(PSB_TRIANGLE)) {
-      if(deltaRegServo==100){ 
+      if(deltaRegServo==100){
         deltaRegServo=10;
       } else if(deltaRegServo==10) {
         deltaRegServo=1;
@@ -274,7 +274,7 @@ void loop() {
       valJoyDrtY=USSERVOMIN;
     } else if (valJoyDrtY>USSERVOMAX){
       valJoyDrtY=USSERVOMAX;
-    }    
+    }
     pwm.writeMicroseconds(servonum, valJoyDrtY);
 
     // actions sur LED
