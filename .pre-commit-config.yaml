@@ -12,8 +12,10 @@ repos:
             stages: ['commit']
           - id: check-json
             stages: ['commit']
+            exclude: '.*\.vscode/.*'
           - id: pretty-format-json
             stages: ['commit']
+            exclude: '.*\.vscode/.*'
           - id: check-xml
             stages: ['commit']
           - id: check-yaml
